@@ -23,8 +23,6 @@ $data = array(
 	'body' => "This is the body!"
 );
 
-//$channels = array('messages');
-
 $pusher = new Pusher($host, $port, $app, $key, $secret);
 
 $pusher->trigger($channels, $event, $data);

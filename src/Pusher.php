@@ -37,26 +37,41 @@ class Pusher
 
 		print_r($dataEncoded);
 
+
+
+
+
+		$hash = $this->buildHash($this->key, $this->secret, 'POST', $this->url, $params = array(), $timestamp = null);
+
+
+
+
+
+
+
 		$client = new \GuzzleHttp\Client();
 
 		# TODO check channels array etc...
 
 		# TODO multi channel in one post ?
 		foreach ($channels as $channel) {
-			$response = $client->request('POST', $this->url, [
-			    'json' => [
-			        'channel' => '/' . $this->app . $channel,
-			        'data' => [
-			        	'app' => $this->app,
-			        	'key' => $this->key,
-			        	'event' => $event,
-			        	'data' => $dataEncoded
-			        ],
+			$response = $client->request(
+				'POST', 
+				$this->url, 
+				[
+				    'json' => [
+				        'channel' => '/' . $this->app . $channel,
+				        'data'    => [
+				        	'hash'  => $hash,
+				        	'key'   => $this->key,
+				        	'event' => $event,
+				        	'data'  => $dataEncoded
+				        ]
 			    ]
 		    ]);
 		}
 		
-		if ($response->getStatusCode() == 200)
+		if ($response->getStatusCode() === 200)
 		{
 			echo 'OK';
 			return true;
@@ -94,6 +109,24 @@ class Pusher
 		/*if (!preg_match('/\A[-a-zA-Z0-9_=@,.;]+\z/', $channel)) {
 			throw new PusherException('Invalid channel name ' . $channel);
 		}*/
+	}
+
+	private function buildHash($key, $secret, $method, $path, $params = array(), $timestamp = null) {
+		$data = array(
+			'method'    => strtoupper($method),
+			'path'      => $path,
+			'timestamp' => time()
+		);
+
+		ksort($data);
+
+		$data = json_encode($data);
+
+		echo $data;
+		echo "+++";
+		$hash = hash_hmac( 'sha256', $data, $secret, false );
+		echo $hash;
+		return $hash;
 	}
 }
 
