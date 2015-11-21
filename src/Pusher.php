@@ -2,52 +2,54 @@
 
 namespace Innova;
 
+//TODO timeout
+
 class Pusher
 {
-	
-	protected $host;
-	protected $port;
 	protected $app;
 	protected $key;
-	protected $timeout;
+	protected $secret;
+	protected $scheme;
+	protected $host;
 	protected $url;
 
-	public function __construct($host, $port, $app, $key, $secret, $timeout = null) {
-		$this->host = $host;
-		$this->port = $port;
-		$this->app  = $app;
-		$this->key  = $key;
+	public function __construct($key, $secret, $app, $url) {
+		$this->checkCompatibility();
 
-		if($port !== null) {
-			$this->url = $this->host . ":" . $this->port;
-		} else {
-			$this->url = $this->host;
+		$this->key    = $key;
+		$this->secret = $secret;
+		$this->app    = $app;
+		$this->url    = $url;
+
+		$match = null;
+		preg_match("/(http[s]?)\:\/\/(.*)/", $url, $match);
+
+		if( count( $match ) === 3 ) {
+			$this->scheme = $match[ 1 ];
+			$this->host   = $match[ 2 ];
 		}
 	}
 
-	public function trigger($channels, $event, $data, $alreadyEncoded = false) {
+	public function checkCompatibility() {
+		if (!extension_loaded( 'json' ))
+		{
+			throw new PusherException('There is amissing dependant extension - please ensure that JSON is installed');
+		}
+		if (!in_array('sha256', hash_algos()))
+		{
+			throw new PusherException('SHA256 appears to be unsupported - make sure you have support for it, or upgrade your version of PHP.');
+		}
+	}
 
+	public function trigger($channels, $event, $data, $alreadyEncoded = false) 
+	{
 		if(is_string($channels) === true ) {
 			$channels = array($channels);
 		}
 
-		$this->validate_channels($channels);
+		$this->validateChannels($channels);
 
 		$dataEncoded = $alreadyEncoded ? $data : json_encode($data);
-
-		print_r($dataEncoded);
-
-
-
-
-
-		$hash = $this->buildHash($this->key, $this->secret, 'POST', $this->url, $params = array(), $timestamp = null);
-
-
-
-
-
-
 
 		$client = new \GuzzleHttp\Client();
 
@@ -55,20 +57,35 @@ class Pusher
 
 		# TODO multi channel in one post ?
 		foreach ($channels as $channel) {
+
+			$postParams = array();
+			$postParams['name']    = $event;
+			$postParams['data']    = $dataEncoded;
+			$postParams['channel'] = $channel;
+
+			$jsonBody = json_encode($postParams);
+
+			$bodyMd5 = md5($jsonBody);
+
+			//echo $this->secret;
+
+			$path = '/apps/' . $this->app . '/events';
+			
+			$queryString = $this->buildQueryString($this->key, $this->secret, 'POST', $path, $timestamp = null);
+
+			$url = $this->url . $path . '?hash=' . $bodyMd5 . '&' .$queryString;
+
 			$response = $client->request(
 				'POST', 
-				$this->url, 
+				$url,
 				[
 				    'json' => [
-				        'channel' => '/' . $this->app . $channel,
-				        'data'    => [
-				        	'hash'  => $hash,
-				        	'key'   => $this->key,
-				        	'event' => $event,
-				        	'data'  => $dataEncoded
-				        ]
-			    ]
-		    ]);
+				        'name'    => $event,
+				        'data'    => $dataEncoded,
+				        'channel' => $channel,
+			    	]
+		    	]
+		    );
 		}
 		
 		if ($response->getStatusCode() === 200)
@@ -91,42 +108,67 @@ class Pusher
 	/**
 	 * validate number of channels and channel name format.
 	 */
-	private function validate_channels($channels) 
+	private function validateChannels($channels) 
 	{
 		if( count( $channels ) > 100 ) {
 			throw new PusherException('An event can be triggered on a maximum of 100 channels in a single call.');
 		}
 		foreach ($channels as $channel) {
-			$this->validate_channel($channel);
+			$this->validateChannel($channel);
 		}
 	}
 
 	/**
 	 * Ensure a channel name is valid based on our spec
 	 */
-	private function validate_channel($channel)
+	private function validateChannel($channel)
 	{
 		/*if (!preg_match('/\A[-a-zA-Z0-9_=@,.;]+\z/', $channel)) {
 			throw new PusherException('Invalid channel name ' . $channel);
 		}*/
 	}
 
-	private function buildHash($key, $secret, $method, $path, $params = array(), $timestamp = null) {
-		$data = array(
-			'method'    => strtoupper($method),
-			'path'      => $path,
-			'timestamp' => time()
-		);
+	private function buildQueryString($key, $secret, $method, $path, $timestamp = null) 
+	{
+		$params = array();
 
-		ksort($data);
+		$params['key'] = $key;
+		$params['timestamp'] = (is_null($timestamp)?time() : $timestamp);
 
-		$data = json_encode($data);
+		ksort($params);
 
-		echo $data;
-		echo "+++";
-		$hash = hash_hmac( 'sha256', $data, $secret, false );
-		echo $hash;
-		return $hash;
+		$method = strtoupper($method);
+
+		$stringToSign = "$method\n" . $path . "\n" . $this->arrayImplode( '=', '&', $params );
+
+		echo($stringToSign);
+
+		$signature = hash_hmac('sha256', $stringToSign, $secret, false);
+
+		$params['signature'] = $signature;
+		ksort($params);
+		$queryString = $this->arrayImplode('=', '&', $params);
+		
+		return $queryString;
+	}
+
+	private function arrayImplode($glue, $separator, $array) 
+	{
+		if (!is_array($array)) {
+			return $array;
+		}
+
+		$string = array();
+
+		foreach ($array as $key => $val) {
+			if (is_array($val)) {
+				$val = implode( ',', $val );
+			}
+
+			$string[] = "{$key}{$glue}{$val}";
+		}
+
+		return implode( $separator, $string );
 	}
 }
 

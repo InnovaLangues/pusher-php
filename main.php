@@ -5,24 +5,23 @@ require __DIR__ . '/src/Pusher.php';
 
 use Innova\Pusher as Pusher;
 
-$host = "http://localhost";
-$port = "8001";
+$url = "http://localhost:8001";
 
 $app = "1278690433";
 $key = "98f0b777783fe1bca391";
-$secret = "none";
+$secret = "mysupersecret";
 
 $channels = array(
 	'/messages'
 );
 
-$event = "my-event";
+$event = "my-evenTTTTt";
 
 $data = array(
 	'title' => "This is the title",
 	'body' => "This is the body!"
 );
 
-$pusher = new Pusher($host, $port, $app, $key, $secret);
+$pusher = new Pusher($key, $secret, $app, $url);
 
 $pusher->trigger($channels, $event, $data);
