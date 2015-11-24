@@ -8,8 +8,8 @@ use Innova\Pusher as Pusher;
 $url = "http://localhost:8001";
 
 $app = "1";
-$key = "AAA";
-$secret = "XXX";
+$key = "efe1bba83789098f0a6c";
+$secret = "b03c03dddf8983b76479";
 
 $channels = array(
 	'/messages'

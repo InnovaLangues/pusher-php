@@ -61,15 +61,13 @@ class Pusher
 			$postParams = array();
 			$postParams['name']    = $event;
 			$postParams['data']    = $dataEncoded;
-			$postParams['channel'] = $channel;
+			$postParams['channel'] = "/" . $this->app . $channel;
 
 			$jsonBody = json_encode($postParams);
 
 			$bodyMd5 = md5($jsonBody);
 
-			//echo $this->secret;
-
-			$path = '/apps/' . $this->app . '/events';
+			$path = '/ws/' . $this->app . '/events';
 			
 			$queryString = $this->buildQueryString($this->key, $this->secret, 'POST', $path, $timestamp = null);
 
@@ -82,7 +80,7 @@ class Pusher
 				    'json' => [
 				        'name'    => $event,
 				        'data'    => $dataEncoded,
-				        'channel' => $channel,
+				        'channel' => "/" . $this->app . $channel,
 			    	]
 		    	]
 		    );
